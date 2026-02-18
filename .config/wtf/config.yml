@@ -1,0 +1,71 @@
+wtf:
+  colors:
+    border:
+      focusable: darkslateblue
+      focused: orange
+      normal: gray
+  grid:
+    columns: [40, 40, 40]  # 株価を左に広く
+    rows: [5, 12, 52]
+  refreshInterval: 1
+  mods:
+    resourceusage:
+      cpuCombined: true
+      enabled: true
+      position:
+        top: 0
+        left: 0
+        height: 1
+        width: 1
+      refreshInterval: 1s
+      showCPU: true
+      showMem: true
+      showSwp: true
+    news:
+      title: 国内
+      enabled: true
+      type: feedreader
+      feeds:
+        - https://news.yahoo.co.jp/rss/topics/top-picks.xml
+      feedLimit: 3
+      position:
+        top: 0
+        left: 1
+        height: 1
+        width: 2
+      refreshInterval: 1800s
+    hackernews:
+      enabled: true
+      type: hackernews
+      numberOfStories: 10
+      storyType: top
+      position:
+        top: 1
+        left: 0
+        height: 1
+        width: 3
+      refreshInterval: 1800s  # HNは5分ごと
+    aifeeds:
+      enabled: true
+      type: feedreader
+      feeds:
+      - https://qiita.com/tags/llm/feed
+      - https://huggingface.co/blog/feed.xml
+      - https://deepmind.google/blog/rss.xml
+      - https://openai.com/blog/rss.xml
+      - https://feeds.feedburner.com/blogspot/gJZg
+      - https://www.ai-shift.co.jp/techblog/feed
+      - https://zenn.dev/topics/llm/feed
+      - https://zenn.dev/topics/nlp/feed
+      - https://zenn.dev/topics/%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92/feed
+      - https://qiita.com/tags/%e6%a9%9f%e6%a2%b0%e5%ad%a6%e7%bf%92/feed
+      - https://note.com/hashtag/LLM/rss
+      - https://feeds.feedburner.com/nvidiablog
+      feedLimit: 50
+      position:
+        top: 2
+        left: 0
+        height: 1
+        width: 3
+      title: "AI News"
+      refreshInterval: 1800s

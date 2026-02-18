@@ -56,7 +56,7 @@ motd() {
         "MEMORY:||$(free -mh | awk '/Mem/{print $3"/"$2}')"
         "CPU:||$(awk '/cpu /{printf "%.1f%%", ($2+$4)*100/($2+$4+$5)}' /proc/stat)"
         "DISK:||$(df -h / | awk 'NR==2{print $3"/"$2" ("$5")"}')"
-        "GPU:||$(lspci | grep -i vga | sed 's/.*: //' | cut -c1-60)"
+        "GPU:||$(lspci | grep -i vga | sed 's/.*: //'| tr '\n' ' '  | cut -c1-60)"
         "IP:||$(ip -4 addr show | awk '/inet.*scope global/{print $2; exit}')"
         "DATE:||$(date '+%Y-%m-%d %H:%M')"
         "TODO:||$(head -1 ~/.todo 2>/dev/null || echo 'Nothing!')"
@@ -81,6 +81,15 @@ motd() {
     fi
 }
 motd
+
+# ghq + fzf でリポジトリにジャンプ
+ghq-fzf() {
+    local dir=$(ghq list -p | fzf --query "$1")
+    if [ -n "$dir" ]; then
+        cd "$dir"
+    fi
+}
+bind '"\C-]": "\C-a\C-k ghq-fzf\n"'
 
 # starship
 eval "$(starship init bash)"
