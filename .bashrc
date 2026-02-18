@@ -29,37 +29,56 @@ HISTCONTROL=ignoreboth  # ignoredups + ignorespace
 HISTTIMEFORMAT="%F %T  "
 shopt -s histappend
 
-# alias
-# Move to the parent folder.
-alias ..='cd ..'
-# Move up two parent folders.
-alias ...='cd ../../'
-# Move up three parent folders.
-alias ~='cd ~'
-
-alias g='git'
-alias g='git'
-alias gs='git status'
-alias ga='git add .'
-alias gc='git commit -m'
-alias gp='git push'
-alias gl='git log --oneline -20'
-
-alias reload='source ~/.bashrc'
-alias h='history | grep'
-alias cls='clear'
+source ~/.bashrc.aliases
 
 # motd表示は関数にして起動後に呼ぶ
 motd() {
-    printf "\n"
-    printf " %s\n" "USER: $USER"
-    printf " %s\n" "DATE: $(date)"
-    printf " %s\n" "UPTIME: $(uptime -p)"
-    printf " %s\n" "HOSTNAME: $(hostname -f)"
-    printf " %s\n" "CPU: $(awk -F: '/model name/{print $2; exit}' /proc/cpuinfo)"
-    printf " %s\n" "KERNEL: $(uname -rms)"
-    printf " %s\n" "MEMORY: $(free -mh | awk '/Mem/{print $3"/"$2}')"
-    printf "\n"
+    local art_width=80   # chafaの--sizeの横幅
+    local text_col=50     # テキスト開始カラム（左から何文字目）
+    local text_row=5      # テキスト開始行（上から何行目）
+    
+    cat ~/.motd_art
+
+    # アートの先頭に戻る
+    local art_lines
+    art_lines=$(wc -l < ~/.motd_art)
+    printf "\033[%dA" "$art_lines"  # アートの行数分カーソルを上へ
+
+    # テキスト開始行まで下げる
+    printf "\033[%dB" "$text_row"
+
+    # 各行を指定カラムに出力
+    local items=(
+        "USER:||$USER"
+        "HOST:||$(hostname)"
+        "KERNEL:||$(uname -r)"
+        "UPTIME:||$(uptime -p)"
+        "MEMORY:||$(free -mh | awk '/Mem/{print $3"/"$2}')"
+        "CPU:||$(awk '/cpu /{printf "%.1f%%", ($2+$4)*100/($2+$4+$5)}' /proc/stat)"
+        "DISK:||$(df -h / | awk 'NR==2{print $3"/"$2" ("$5")"}')"
+        "GPU:||$(lspci | grep -i vga | sed 's/.*: //' | cut -c1-60)"
+        "IP:||$(ip -4 addr show | awk '/inet.*scope global/{print $2; exit}')"
+        "DATE:||$(date '+%Y-%m-%d %H:%M')"
+        "TODO:||$(head -1 ~/.todo 2>/dev/null || echo 'Nothing!')"
+        "QUOTE:||$(fortune -s -n 80 2>/dev/null | tr '\n' ' ' | cut -c1-60 || echo 'Stay curious.')"
+    )
+    # バッテリーがあれば追加
+    if [ -d /sys/class/power_supply/BAT0 ]; then
+        local bat_cap=$(cat /sys/class/power_supply/BAT0/capacity)
+        local bat_status=$(cat /sys/class/power_supply/BAT0/status)
+        items+=("BATTERY:||${bat_cap}% (${bat_status})")
+    fi
+    for item in "${items[@]}"; do
+        local label="${item%%||*}"
+        local value="${item##*||}"
+        printf "\033[%dG\033[35m%-12s\033[0m %s\n" "$text_col" "$label" "$value"
+    done
+
+    # カーソルをアートの下まで戻す
+    local remaining=$((art_lines - text_row - ${#items[@]}))
+    if [ "$remaining" -gt 0 ]; then
+        printf "\033[%dB" "$remaining"
+    fi
 }
 motd
 

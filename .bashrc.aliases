@@ -1,0 +1,23 @@
+# alias
+# Move to the parent folder.
+alias ..='cd ..'
+# Move up two parent folders.
+alias ...='cd ../../'
+# Move up three parent folders.
+alias ~='cd ~'
+
+alias g='git'
+alias g='git'
+alias gs='git status'
+alias ga='git add .'
+alias gc='git commit -m'
+alias gp='git push'
+alias gl='git log --oneline -20'
+
+alias reload='source ~/.bashrc'
+alias h='history | grep'
+alias cls='clear'
+
+alias ll="ls -la"
+
+alias vc="claude --dangerously-skip-permissions"

@@ -1,0 +1,9 @@
+[alias]
+    st = status
+    co = checkout
+    cm = commit -m
+    pp = pull --prune
+    poh = push origin HEAD
+    po = push origin
+    cl = clone
+    
