@@ -145,3 +145,4 @@ bind '"\C-]": "\C-a\C-k ghq-fzf\n"'
 
 # starship
 eval "$(starship init bash)"
+. "/home/m96-chan/.deno/env"
