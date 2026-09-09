@@ -143,5 +143,10 @@ ghq-fzf() {
 }
 bind '"\C-]": "\C-a\C-k ghq-fzf\n"'
 
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+export ANDROID_HOME=$HOME/Android/Sdk
+export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/29.0.14206865
+export PATH=$PATH:$ANDROID_HOME/platform-tools
+
 # starship
 eval "$(starship init bash)"
