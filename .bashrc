@@ -150,3 +150,4 @@ export PATH=$PATH:$ANDROID_HOME/platform-tools
 
 # starship
 eval "$(starship init bash)"
+. "/home/m96-chan/.deno/env"
