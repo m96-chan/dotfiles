@@ -180,8 +180,9 @@ motd() {
     local label_width=12
     local value_width=$((box_width - 17))
 
-    local border=$'\033[38;5;139m'
-    local label_col=$'\033[35m'
+    # 配色は .motd_art のキャラの差し色から (緑=#70c5c4 / 赤=#ea438d)
+    local border=$'\033[38;2;112;197;196m'
+    local label_col=$'\033[38;2;234;67;141m'
     local reset=$'\033[0m'
 
     cat ~/.motd_art
