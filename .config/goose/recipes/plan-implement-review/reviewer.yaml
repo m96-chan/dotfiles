@@ -1,0 +1,31 @@
+version: 1.0.0
+title: reviewer
+description: GPT-6 Astra による実装レビュー
+parameters:
+  - key: plan
+    input_type: string
+    requirement: required
+    description: 採用された実装計画
+  - key: implementation_report
+    input_type: string
+    requirement: required
+    description: ワーカーからの実装報告
+instructions: |
+  あなたはコードレビュー担当です。実際の差分・ファイルを読んで検証してください。
+  指摘は「差し戻しが必要な問題」と「任意の改善提案」を明確に分けてください。
+prompt: |
+  以下の計画と実装報告をレビューしてください。実際のコードを読んで裏取りすること。
+
+  ## 計画
+  {{ plan }}
+
+  ## 実装報告
+  {{ implementation_report }}
+
+  出力形式:
+  - 判定: APPROVED または CHANGES_REQUESTED
+  - 差し戻しが必要な問題(該当箇所と理由。なければ「なし」)
+  - 任意の改善提案
+settings:
+  goose_provider: codex-acp
+  goose_model: gpt-6-astra

@@ -1,0 +1,23 @@
+version: 1.0.0
+title: planner-fable
+description: Claude Fable 5 による実装計画の立案
+parameters:
+  - key: task
+    input_type: string
+    requirement: required
+    description: 計画を立てる対象のタスク
+instructions: |
+  あなたは実装計画の立案担当です。コードは書かず、計画だけを出力します。
+  必要ならリポジトリを読み、現状を把握した上で計画してください。
+prompt: |
+  次のタスクの実装計画を作成してください:
+
+  {{ task }}
+
+  出力形式:
+  - 目的と前提
+  - 実装ステップ(番号付き、各ステップの対象ファイルと変更内容)
+  - リスクと検証方法
+settings:
+  goose_provider: claude-acp
+  goose_model: fable

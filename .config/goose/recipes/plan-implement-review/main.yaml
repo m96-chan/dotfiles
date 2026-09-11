@@ -1,0 +1,36 @@
+version: 1.0.0
+title: plan-implement-review
+description: 計画(Fable)→実装(Opus+Sol)→レビュー(Astra)のワークフロー
+parameters:
+  - key: task
+    input_type: string
+    requirement: required
+    description: 実行するタスクの内容
+instructions: |
+  あなたはオーケストレーターです。自分では計画・実装・レビューをせず、
+  サブレシピを呼び出して進行管理だけを行います。
+prompt: |
+  次のタスクを plan-implement-review ワークフローで完遂してください:
+
+  {{ task }}
+
+  手順:
+  1. planner_fable にタスクを渡して実装計画を作らせる
+  2. 計画の実装ステップを implementer_opus と implementer_sol に分担させる
+     (依存関係のあるステップは同じワーカーにまとめること)
+  3. 全ワーカーの実装報告が揃ったら reviewer に計画と報告を渡してレビューさせる
+  4. 判定が CHANGES_REQUESTED なら、指摘を feedback として該当ワーカーに差し戻す
+  5. APPROVED になるまで 3-4 を繰り返す(最大3回。超えたら現状と残課題を報告して終了)
+  6. 最後に、採用した計画・分担・レビュー結果・最終状態を要約して報告する
+sub_recipes:
+  - name: planner_fable
+    path: ./planner_fable.yaml
+  - name: implementer_opus
+    path: ./implementer_opus.yaml
+  - name: implementer_sol
+    path: ./implementer_sol.yaml
+  - name: reviewer
+    path: ./reviewer.yaml
+settings:
+  goose_provider: claude-acp
+  goose_model: opus

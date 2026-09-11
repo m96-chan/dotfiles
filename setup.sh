@@ -13,3 +13,7 @@ ln -sf "$DOTFILES_DIR/.config/kitty/kitty.conf" ~/.config/kitty/kitty.conf
 
 mkdir -p ~/.config/wtf
 ln -sf "$DOTFILES_DIR/.config/wtf/config.yml" ~/.config/wtf/config.yml
+
+mkdir -p ~/.config/goose
+ln -sf "$DOTFILES_DIR/.config/goose/config.yaml" ~/.config/goose/config.yaml
+ln -sfn "$DOTFILES_DIR/.config/goose/recipes" ~/.config/goose/recipes

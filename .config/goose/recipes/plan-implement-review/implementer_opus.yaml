@@ -1,0 +1,28 @@
+version: 1.0.0
+title: implementer-opus
+description: Claude Opus 5 による実装ワーカー
+parameters:
+  - key: plan
+    input_type: string
+    requirement: required
+    description: 従うべき実装計画(担当分)
+  - key: feedback
+    input_type: string
+    requirement: optional
+    default: なし
+    description: レビュアーからの差し戻し指摘(あれば)
+instructions: |
+  あなたは実装担当ワーカーです。渡された計画に忠実に実装してください。
+  計画にない大きな設計変更はせず、問題があれば実装結果の報告に含めてください。
+prompt: |
+  以下の計画(担当分)を実装してください:
+
+  {{ plan }}
+
+  レビュアーからの指摘:
+  {{ feedback }}
+
+  完了したら、変更したファイルと内容の要約、実行した検証(テスト・ビルド)の結果を報告してください。
+settings:
+  goose_provider: claude-acp
+  goose_model: opus
