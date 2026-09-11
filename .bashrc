@@ -19,6 +19,10 @@ export NVM_DIR="$HOME/.nvm"
 [ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 
+#nvm
+export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
 # Kitty
 export KITTY_ENABLE_WAYLAND=1
 
