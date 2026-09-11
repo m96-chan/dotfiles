@@ -304,3 +304,20 @@ export PATH="$HOME/.grok/bin:$PATH"
 
 # opencode
 export PATH=/home/m96-chan/.opencode/bin:$PATH
+
+# --- AUR ビルド用の環境分離 ---------------------------------------
+# pyenv の shim が makepkg 内の `python` を 3.11 に乗っ取ってしまい、
+# python 系 AUR パッケージ (python-einops など) のビルドが失敗するため、
+# AUR ビルド時だけ PATH から pyenv を外してシステム Python を使わせる。
+# uv も同様に、管理版 Python をダウンロードせずシステム Python を使う。
+_aur_build_env() {
+    local p
+    p=$(printf '%s' "$PATH" | tr ':' '\n' | grep -vF "$HOME/.pyenv" | paste -sd:)
+    env -u PYENV_VERSION -u PYENV_ROOT -u PKG_CONFIG_PATH \
+        PATH="$p" \
+        UV_PYTHON_PREFERENCE=only-system \
+        UV_PYTHON_DOWNLOADS=never \
+        "$@"
+}
+yay()     { _aur_build_env yay "$@"; }
+makepkg() { _aur_build_env makepkg "$@"; }
