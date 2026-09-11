@@ -296,3 +296,11 @@ export PATH=$PATH:$ANDROID_HOME/platform-tools
 eval "$(starship init bash)"
 # deno (未インストールの環境ではスキップ)
 [ -f "$HOME/.deno/env" ] && . "$HOME/.deno/env"
+
+# >>> grok installer >>>
+export PATH="$HOME/.grok/bin:$PATH"
+[[ -r "$HOME/.grok/completions/bash/grok.bash" ]] && source "$HOME/.grok/completions/bash/grok.bash"
+# <<< grok installer <<<
+
+# opencode
+export PATH=/home/m96-chan/.opencode/bin:$PATH
