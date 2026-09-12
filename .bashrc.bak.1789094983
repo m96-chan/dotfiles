@@ -19,10 +19,6 @@ export NVM_DIR="$HOME/.nvm"
 [ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 
-#nvm
-export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-
 # Kitty
 export KITTY_ENABLE_WAYLAND=1
 
@@ -296,79 +292,3 @@ export PATH=$PATH:$ANDROID_HOME/platform-tools
 eval "$(starship init bash)"
 # deno (未インストールの環境ではスキップ)
 [ -f "$HOME/.deno/env" ] && . "$HOME/.deno/env"
-
-# >>> grok installer >>>
-export PATH="$HOME/.grok/bin:$PATH"
-[[ -r "$HOME/.grok/completions/bash/grok.bash" ]] && source "$HOME/.grok/completions/bash/grok.bash"
-# <<< grok installer <<<
-
-# opencode
-export PATH=/home/m96-chan/.opencode/bin:$PATH
-
-# --- AUR ビルド用の環境分離 ---------------------------------------
-# pyenv の shim が makepkg 内の `python` を 3.11 に乗っ取ってしまい、
-# python 系 AUR パッケージ (python-einops など) のビルドが失敗するため、
-# AUR ビルド時だけ PATH から pyenv を外してシステム Python を使わせる。
-# uv も同様に、管理版 Python をダウンロードせずシステム Python を使う。
-_aur_build_env() {
-    local p
-    p=$(printf '%s' "$PATH" | tr ':' '\n' | grep -vF "$HOME/.pyenv" | paste -sd:)
-    env -u PYENV_VERSION -u PYENV_ROOT -u PKG_CONFIG_PATH \
-        PATH="$p" \
-        UV_PYTHON_PREFERENCE=only-system \
-        UV_PYTHON_DOWNLOADS=never \
-        "$@"
-}
-yay()     { _aur_build_env yay "$@"; }
-makepkg() { _aur_build_env makepkg "$@"; }
-
-# --- goose マルチモデル worker -------------------------------------
-# ACP プロバイダ (claude-acp / codex-acp) 配下では goose 側の
-# GOOSE_SUBAGENT_* が効かず、内蔵の委譲ではサブエージェントのモデルを
-# リードと別にできない。そのため worker の分担は goose に任せず、
-# レシピを CLI から直接叩いてモデルを明示的に切り替える。
-GOOSE_RECIPES="${XDG_CONFIG_HOME:-$HOME/.config}/goose/recipes/plan-implement-review"
-
-# 計画やレビュー指摘は複数行になるので、素の文字列に加えて
-# '-' で stdin、'@path' でファイルからも渡せるようにする。
-_goose_arg() {
-    case "$1" in
-        -)  cat ;;
-        @*) cat -- "${1#@}" ;;
-        *)  printf '%s' "$1" ;;
-    esac
-}
-
-_goose_recipe() {
-    local recipe=$1; shift
-    goose run --no-session --max-turns "${GOOSE_WORKER_MAX_TURNS:-50}" \
-        --recipe "$GOOSE_RECIPES/$recipe" "$@"
-}
-
-# 計画立案 (Fable): goose-plan <task|-|@file>
-goose-plan() {
-    [ $# -ge 1 ] || { echo "usage: goose-plan <task|-|@file>" >&2; return 2; }
-    _goose_recipe planner_fable.yaml --params task="$(_goose_arg "$1")"
-}
-
-# 実装 (Sol / Opus): goose-impl <sol|opus> <plan|-|@file> [feedback|@file]
-goose-impl() {
-    local recipe
-    case "$1" in
-        sol)  recipe=implementer_sol.yaml ;;
-        opus) recipe=implementer_opus.yaml ;;
-        *)    echo "usage: goose-impl <sol|opus> <plan|-|@file> [feedback|@file]" >&2; return 2 ;;
-    esac
-    [ $# -ge 2 ] || { echo "usage: goose-impl <sol|opus> <plan|-|@file> [feedback|@file]" >&2; return 2; }
-    _goose_recipe "$recipe" \
-        --params plan="$(_goose_arg "$2")" \
-        --params feedback="$(_goose_arg "${3:-なし}")"
-}
-
-# レビュー (Astra): goose-review <plan|-|@file> <report|-|@file>
-goose-review() {
-    [ $# -ge 2 ] || { echo "usage: goose-review <plan|-|@file> <report|-|@file>" >&2; return 2; }
-    _goose_recipe reviewer.yaml \
-        --params plan="$(_goose_arg "$1")" \
-        --params implementation_report="$(_goose_arg "$2")"
-}
