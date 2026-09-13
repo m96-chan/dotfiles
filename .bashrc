@@ -179,10 +179,11 @@ _motd_wrap() {
 }
 
 motd() {
-    local text_col=42
-    local box_width=64
-    local label_width=12
-    local value_width=$((box_width - 17))
+    # 左のアートに40列、右の情報欄に40列を使う。
+    local text_col=41
+    local box_width=40
+    local label_width=8
+    local value_width=$((box_width - label_width - 5))
 
     # 配色は .motd_art のキャラの差し色から (緑=#70c5c4 / 赤=#ea438d)
     local border=$'\033[38;2;112;197;196m'
@@ -243,7 +244,8 @@ motd() {
 
     local body_lines=${#body_value[@]}
     local box_height=$((body_lines + 2))
-    local start_row=$(((art_lines - box_height) / 2))
+    # 吹き出しを中央配置から5行上にずらす。
+    local start_row=$(((art_lines - box_height) / 2 - 5))
     [ "$start_row" -lt 0 ] && start_row=0
 
     # しっぽはキャラの顔の高さ (アート 10 行目付近) に合わせる
