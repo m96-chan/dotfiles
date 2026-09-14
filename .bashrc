@@ -16,7 +16,7 @@ case "$OSTYPE" in
     linux*)
         # Remove inherited Homebrew search paths after migration to pacman.
         for _path_var in PATH MANPATH INFOPATH XDG_DATA_DIRS PKG_CONFIG_PATH; do
-            [[ -v $_path_var ]] || continue
+            declare -p "$_path_var" >/dev/null 2>&1 || continue
             IFS=: read -r -a _path_parts <<< "${!_path_var}"
             _path_clean=()
             for _path_part in "${_path_parts[@]}"; do
@@ -24,7 +24,7 @@ case "$OSTYPE" in
                 _path_clean+=("$_path_part")
             done
             printf -v "$_path_var" '%s' "$(IFS=:; printf '%s' "${_path_clean[*]}")"
-            export "$_path_var"
+            export "${_path_var?}"
         done
         unset _path_var _path_parts _path_part _path_clean
         unset HOMEBREW_PREFIX HOMEBREW_CELLAR HOMEBREW_REPOSITORY
@@ -378,11 +378,21 @@ motd() {
     local reset=$'\033[0m'
 
     local cols=${COLUMNS:-80} art_lines=0 compact=1
+    local _tty_rows tty_cols art_line
+    local art=()
+    # SSH の起動直後も、環境変数より PTY の実際の幅を優先する。
+    if [[ -t 1 ]]; then
+        read -r _tty_rows tty_cols < <(stty size 2>/dev/null)
+        [[ $tty_cols =~ ^[1-9][0-9]*$ ]] && cols=$tty_cols
+    fi
     [[ $cols =~ ^[0-9]+$ ]] || cols=80
     [ "$cols" -ge 2 ] || return 0
     if [[ -t 1 && ${TERM:-dumb} != dumb && $cols -ge 80 && -r "$HOME/.motd_art" ]]; then
-        art_lines=$(wc -l < "$HOME/.motd_art")
-        if ((art_lines >= 3 && ${LINES:-35} > art_lines)); then
+        while IFS= read -r art_line || [[ -n $art_line ]]; do
+            art+=("$art_line")
+        done < "$HOME/.motd_art"
+        art_lines=${#art[@]}
+        if ((art_lines >= 3)); then
             compact=0
         fi
     fi
@@ -421,7 +431,7 @@ motd() {
     local body_label=() body_value=()
     local item label value line first
 
-    # 狭い／低いペイン、アートなし、リダイレクト時はカーソル移動を使わない。
+    # 横幅が足りないペイン、アートなし、リダイレクト時はテキスト表示。
     if ((compact)); then
         for item in "${items[@]}"; do
             label="${item%%||*}"
@@ -432,7 +442,6 @@ motd() {
         return 0
     fi
 
-    cat "$HOME/.motd_art"
     local max_body=$((art_lines - 2))
     for item in "${items[@]}"; do
         label="${item%%||*}"
@@ -466,27 +475,28 @@ motd() {
     local hline
     hline=$(printf '─%.0s' $(seq 1 $((box_width - 2))))
 
-    printf "\033[%dA" "$art_lines"
-    [ "$start_row" -gt 0 ] && printf "\033[%dB" "$start_row"
-
-    printf "\033[%dG%s╭%s╮%s\n" "$text_col" "$border" "$hline" "$reset"
-
-    local i
-    for ((i = 0; i < body_lines; i++)); do
-        if [ "$i" -eq "$tail_row" ]; then
-            printf "\033[%dG%s◥│%s" "$((text_col - 1))" "$border" "$reset"
-        else
-            printf "\033[%dG%s│%s" "$text_col" "$border" "$reset"
+    # アートと情報欄を1行ずつ出力する。画面を上に戻さないので、
+    # SSH の24行端末などでも上端に重ね描きせずスクロールできる。
+    local row i
+    for ((row = 0; row < art_lines; row++)); do
+        printf '%s%s' "${art[row]}" "$reset"
+        i=$((row - start_row - 1))
+        if ((row == start_row)); then
+            printf "\033[%dG%s╭%s╮%s" "$text_col" "$border" "$hline" "$reset"
+        elif ((i >= 0 && i < body_lines)); then
+            if ((i == tail_row)); then
+                printf "\033[%dG%s◥│%s" "$((text_col - 1))" "$border" "$reset"
+            else
+                printf "\033[%dG%s│%s" "$text_col" "$border" "$reset"
+            fi
+            printf " %s%-*s%s %s %s│%s" \
+                "$label_col" "$label_width" "${body_label[i]}" "$reset" \
+                "${body_value[i]}" "$border" "$reset"
+        elif ((i == body_lines)); then
+            printf "\033[%dG%s╰%s╯%s" "$text_col" "$border" "$hline" "$reset"
         fi
-        printf " %s%-*s%s %s %s│%s\n" \
-            "$label_col" "$label_width" "${body_label[i]}" "$reset" \
-            "${body_value[i]}" "$border" "$reset"
+        printf '\n'
     done
-
-    printf "\033[%dG%s╰%s╯%s\n" "$text_col" "$border" "$hline" "$reset"
-
-    local remaining=$((art_lines - start_row - box_height))
-    [ "$remaining" -gt 0 ] && printf "\033[%dB" "$remaining"
     return 0
 }
 # パイプやコマンド置換には起動メッセージを混ぜない。
