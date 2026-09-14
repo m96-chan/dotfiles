@@ -12,6 +12,25 @@ esac
 alias grep='grep --color=auto'
 PS1='[\u@\h \W]\$ '
 
+case "$OSTYPE" in
+    linux*)
+        # Remove inherited Homebrew search paths after migration to pacman.
+        for _path_var in PATH MANPATH INFOPATH XDG_DATA_DIRS PKG_CONFIG_PATH; do
+            [[ -v $_path_var ]] || continue
+            IFS=: read -r -a _path_parts <<< "${!_path_var}"
+            _path_clean=()
+            for _path_part in "${_path_parts[@]}"; do
+                case "$_path_part" in /home/linuxbrew/.linuxbrew|/home/linuxbrew/.linuxbrew/*) continue ;; esac
+                _path_clean+=("$_path_part")
+            done
+            printf -v "$_path_var" '%s' "$(IFS=:; printf '%s' "${_path_clean[*]}")"
+            export "$_path_var"
+        done
+        unset _path_var _path_parts _path_part _path_clean
+        unset HOMEBREW_PREFIX HOMEBREW_CELLAR HOMEBREW_REPOSITORY
+        ;;
+esac
+
 # PATH を reload のたびに重複させない。
 _path_prepend() {
     case ":$PATH:" in
@@ -20,8 +39,9 @@ _path_prepend() {
     esac
 }
 
-# Homebrew は任意。Arch の pacman のみの環境でも動く。
+# Homebrew は macOS 用。Linux では pacman への移行設定を維持する。
 _bashrc_brew() {
+    case "$OSTYPE" in linux*) return 0 ;; esac
     local brew_bin
     if [[ -n ${HOMEBREW_PREFIX:-} && -n ${HOMEBREW_CELLAR:-} \
         && :$PATH: == *":$HOMEBREW_PREFIX/bin:"* \
@@ -51,7 +71,9 @@ _path_prepend "$HOME/.local/bin"
 # nvm: ユーザーのインストールを優先し、Homebrew はフォールバックにする。
 # reload 時も読み込み済みなら再実行しない。
 _bashrc_load_nvm() {
-    if [ -z "${NVM_DIR:-}" ]; then
+    if [[ $OSTYPE == linux* ]]; then
+        NVM_DIR="$HOME/.nvm"
+    elif [ -z "${NVM_DIR:-}" ]; then
         NVM_DIR="$HOME/.nvm"
         [ -n "${XDG_CONFIG_HOME:-}" ] && NVM_DIR="$XDG_CONFIG_HOME/nvm"
     fi
@@ -61,7 +83,7 @@ _bashrc_load_nvm() {
     local dir script
     local dirs=("$NVM_DIR")
     case "$OSTYPE" in
-        linux*) dirs+=(/usr/share/nvm "${HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}/opt/nvm") ;;
+        linux*) dirs=(/usr/share/nvm "$NVM_DIR") ;;
         darwin*) dirs+=("${HOMEBREW_PREFIX:-/opt/homebrew}/opt/nvm" /usr/local/opt/nvm) ;;
     esac
     for dir in "${dirs[@]}"; do
@@ -87,6 +109,9 @@ _bashrc_load_nvm() {
 }
 _bashrc_load_nvm
 unset -f _bashrc_load_nvm
+
+# Activate the retained Python 3.14 ML environment when needed.
+ml-python() { source "$HOME/.local/share/venvs/ml-py314/bin/activate"; }
 
 # history
 HISTSIZE=10000
