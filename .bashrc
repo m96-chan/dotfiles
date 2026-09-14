@@ -5,51 +5,136 @@
 # If not running interactively, don't do anything
 [[ $- != *i* ]] && return
 
-alias ls='ls --color=auto'
+case "$OSTYPE" in
+    darwin*) alias ls='ls -G' ;;
+    *)       alias ls='ls --color=auto' ;;
+esac
 alias grep='grep --color=auto'
 PS1='[\u@\h \W]\$ '
 
-# nvm
-export NVM_DIR="$HOME/.nvm"
-[ -s "/home/linuxbrew/.linuxbrew/opt/nvm/nvm.sh" ] && \. "/home/linuxbrew/.linuxbrew/opt/nvm/nvm.sh"  # This loads nvm
-[ -s "/home/linuxbrew/.linuxbrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/home/linuxbrew/.linuxbrew/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
+# PATH を reload のたびに重複させない。
+_path_prepend() {
+    case ":$PATH:" in
+        *":$1:"*) ;;
+        *) export PATH="$1${PATH:+:$PATH}" ;;
+    esac
+}
 
-# brew
-[ -f /home/linuxbrew/.linuxbrew/bin/brew ] && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv bash)"
+# Homebrew は任意。Arch の pacman のみの環境でも動く。
+_bashrc_brew() {
+    local brew_bin
+    if [[ -n ${HOMEBREW_PREFIX:-} && -n ${HOMEBREW_CELLAR:-} \
+        && :$PATH: == *":$HOMEBREW_PREFIX/bin:"* \
+        && :$PATH: == *":$HOMEBREW_PREFIX/sbin:"* ]]; then
+        return 0
+    fi
+    brew_bin=$(command -v brew 2>/dev/null) || brew_bin=''
+    if [ -z "$brew_bin" ]; then
+        case "$OSTYPE" in
+            darwin*)
+                for brew_bin in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+                    [ -x "$brew_bin" ] && break
+                done
+                ;;
+            linux*) brew_bin=/home/linuxbrew/.linuxbrew/bin/brew ;;
+        esac
+    fi
+    [ -x "$brew_bin" ] && eval "$("$brew_bin" shellenv bash)"
+    return 0
+}
+_bashrc_brew
+unset -f _bashrc_brew
 [ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"
-export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+_path_prepend "${CARGO_HOME:-$HOME/.cargo}/bin"
+_path_prepend "$HOME/.local/bin"
 
-#nvm
-export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+# nvm: ユーザーのインストールを優先し、Homebrew はフォールバックにする。
+# reload 時も読み込み済みなら再実行しない。
+_bashrc_load_nvm() {
+    if [ -z "${NVM_DIR:-}" ]; then
+        NVM_DIR="$HOME/.nvm"
+        [ -n "${XDG_CONFIG_HOME:-}" ] && NVM_DIR="$XDG_CONFIG_HOME/nvm"
+    fi
+    export NVM_DIR
+    declare -F nvm >/dev/null && return
 
-# Kitty
-export KITTY_ENABLE_WAYLAND=1
+    local dir script
+    local dirs=("$NVM_DIR")
+    case "$OSTYPE" in
+        linux*) dirs+=(/usr/share/nvm "${HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}/opt/nvm") ;;
+        darwin*) dirs+=("${HOMEBREW_PREFIX:-/opt/homebrew}/opt/nvm" /usr/local/opt/nvm) ;;
+    esac
+    for dir in "${dirs[@]}"; do
+        # Arch の nvm パッケージは初期化と補完をこのスクリプトで行う。
+        if [ -s "$dir/init-nvm.sh" ]; then
+            source "$dir/init-nvm.sh"
+            return
+        fi
+        if [ -s "$dir/nvm.sh" ]; then
+            source "$dir/nvm.sh"
+            break
+        fi
+    done
+    declare -F nvm >/dev/null || return 0
+    for dir in "${dirs[@]}"; do
+        for script in "$dir/bash_completion" "$dir/etc/bash_completion.d/nvm"; do
+            if [ -s "$script" ]; then
+                source "$script"
+                return
+            fi
+        done
+    done
+}
+_bashrc_load_nvm
+unset -f _bashrc_load_nvm
 
 # history
 HISTSIZE=10000
 HISTFILESIZE=20000
 HISTCONTROL=ignoreboth  # ignoredups + ignorespace
 HISTTIMEFORMAT="%F %T  "
-shopt -s histappend
+shopt -s histappend checkwinsize
 
-source ~/.bashrc.aliases
+[ -r "$HOME/.bashrc.aliases" ] && source "$HOME/.bashrc.aliases"
+
+# Arch と Homebrew の bash-completion。fzf より先に読み込む。
+if ! declare -F _completion_loader >/dev/null; then
+    if ((BASH_VERSINFO[0] >= 4)); then
+        _completion_files=("${HOMEBREW_PREFIX:-/nonexistent}/etc/profile.d/bash_completion.sh"
+            /usr/share/bash-completion/bash_completion)
+    else
+        _completion_files=("${HOMEBREW_PREFIX:-/nonexistent}/etc/bash_completion")
+    fi
+    for _completion in "${_completion_files[@]}"; do
+        if [ -r "$_completion" ]; then
+            source "$_completion"
+            break
+        fi
+    done
+    unset _completion _completion_files
+fi
 
 # --- MOTD: OS 別ヘルパー関数 ---
 
 get_uptime() {
     case "$OSTYPE" in
         linux*)  uptime -p ;;
-        darwin*) uptime | sed 's/.*up //' | sed 's/,\s*[0-9]* user.*//' | xargs ;;
+        darwin*) LC_ALL=C uptime | sed -E 's/^.* up[[:space:]]+//; s/,[[:space:]]*[0-9]+ users?.*$//' ;;
     esac
 }
 
 get_memory() {
     case "$OSTYPE" in
-        linux*)  free -mh | awk '/Mem/{print $3"/"$2}' ;;
+        linux*)  LC_ALL=C free -h | awk '/^Mem:/{print $3"/"$2}' ;;
         darwin*)
-            local total=$(sysctl -n hw.memsize)
-            local used=$(vm_stat | awk '/Pages active|Pages wired/ {sum+=$NF} END {printf "%d", sum*4096}')
+            local total used
+            total=$(sysctl -n hw.memsize) || return
+            # Apple Silicon は16KiBページ。vm_stat のヘッダから実際のサイズを読む。
+            used=$(LC_ALL=C vm_stat | awk '
+                NR == 1 && match($0, /[0-9]+ bytes/) {size=substr($0, RSTART, RLENGTH)+0}
+                /^Pages active:|^Pages wired down:/ {sum+=$NF}
+                END {if (size > 0) printf "%.0f", sum*size; else exit 1}
+            ') || return
             printf "%dMi/%dMi" $((used/1024/1024)) $((total/1024/1024))
             ;;
     esac
@@ -57,21 +142,65 @@ get_memory() {
 
 get_cpu() {
     case "$OSTYPE" in
-        linux*)  awk '/cpu /{printf "%.1f%%", ($2+$4)*100/($2+$4+$5)}' /proc/stat ;;
-        darwin*) top -l 1 -n 0 | awk '/CPU usage/ {print $3}' ;;
+        linux*)
+            # 起動以来の平均ではなく、短い区間の差分を使う。
+            local before
+            IFS= read -r before < /proc/stat || return
+            sleep 0.1
+            LC_ALL=C awk -v before="$before" '
+                BEGIN {split(before, prev)}
+                /^cpu / {
+                    # guest / guest_nice は user / nice に含まれるため二重加算しない。
+                    for (i=2; i<=9; i++) {
+                        delta=$i-prev[i]
+                        if (delta < 0) delta=0
+                        total+=delta
+                        if (i != 5 && i != 6) busy+=delta
+                    }
+                    if (total > 0) printf "%.1f%%\n", busy*100/total
+                    else print "N/A"
+                    exit
+                }
+            ' /proc/stat
+            ;;
+        darwin*)
+            # top の全プロセス走査を避け、1秒間の CPU 統計だけを取得する。
+            # 1回目は起動以来の平均なので捨て、2回目の idle から使用率を求める。
+            LC_ALL=C iostat -d -C -n 0 -c 2 -w 1 2>/dev/null |
+                awk 'NF == 3 && $1 ~ /^[0-9]+$/ {idle=$3; samples++}
+                     END {if (samples >= 2) printf "%.0f%%\n", 100-idle
+                          else print "N/A"}'
+            ;;
     esac
 }
 
 get_gpu() {
-    case "$OSTYPE" in
-        linux*)  lspci | grep -i vga | sed 's/.*: //' | tr '\n' ' ' | cut -c1-60 ;;
-        darwin*) system_profiler SPDisplaysDataType | awk -F': ' '/Chipset Model|Chip/ {print $2; exit}' ;;
-    esac
+    local cache_file="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/motd-gpu-$OSTYPE"
+    local gpu=''
+    if [ "${1:-}" = --cached ]; then
+        [ -r "$cache_file" ] && IFS= read -r gpu < "$cache_file"
+    else
+        gpu=$(case "$OSTYPE" in
+            (linux*)
+                command -v lspci >/dev/null 2>&1 && LC_ALL=C lspci |
+                    awk -F': ' '/VGA compatible controller|3D controller|Display controller/ {printf "%s%s", sep, $2; sep=" / "}'
+                ;;
+            (darwin*) LC_ALL=C system_profiler SPDisplaysDataType | awk -F': ' '/Chipset Model|Chip/ {print $2; exit}' ;;
+        esac)
+        if [ -n "$gpu" ]; then
+            # 保存できない環境でも表示は続ける。キャッシュは実行せず文字列として読む。
+            (umask 077; mkdir -p -- "${cache_file%/*}" && printf '%s\n' "$gpu" > "$cache_file") 2>/dev/null
+        fi
+    fi
+    printf '%s\n' "${gpu:--}"
 }
 
 get_ip() {
     case "$OSTYPE" in
-        linux*)  ip -4 addr show | awk '/inet.*scope global/{print $2; exit}' ;;
+        linux*)
+            command -v ip >/dev/null 2>&1 || { printf 'N/A\n'; return; }
+            ip -4 addr show | awk '/inet.*scope global/{print $2; exit}'
+            ;;
         darwin*) ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "N/A" ;;
     esac
 }
@@ -79,11 +208,16 @@ get_ip() {
 get_battery() {
     case "$OSTYPE" in
         linux*)
-            if [ -d /sys/class/power_supply/BAT0 ]; then
-                local cap=$(cat /sys/class/power_supply/BAT0/capacity)
-                local status=$(cat /sys/class/power_supply/BAT0/status)
-                echo "${cap}% (${status})"
-            fi
+            local battery cap status type
+            for battery in /sys/class/power_supply/*; do
+                [ -r "$battery/type" ] && IFS= read -r type < "$battery/type" || continue
+                [ "$type" = Battery ] || continue
+                [ -r "$battery/capacity" ] && IFS= read -r cap < "$battery/capacity" || continue
+                status=Unknown
+                [ -r "$battery/status" ] && IFS= read -r status < "$battery/status"
+                printf '%s%% (%s)\n' "$cap" "$status"
+                return
+            done
             ;;
         darwin*)
             pmset -g batt 2>/dev/null | awk -F'\t' 'NR==2 {print $2}' | sed 's/;.*//'
@@ -95,13 +229,31 @@ get_battery() {
 
 # 表示幅 (全角を 2 桁として数える) を REPLY に返す
 _motd_dwidth() {
-    local s=$1 w=0 i cp
-    if [[ $s != *[![:ascii:]]* ]]; then
+    local s=$1 w=0 i cp byte count j
+    # Bash 3.2 の printf は Unicode のコードポイントではなく先頭バイトを返す。
+    # UTF-8 をバイト単位で読むことで Bash のバージョンによる差をなくす。
+    local LC_ALL=C
+    # [:ascii:] は macOS 標準 Bash では使えないため文字範囲で判定する。
+    if [[ $s != *[!$'\001'-$'\177']* ]]; then
         REPLY=${#s}
         return
     fi
     for ((i = 0; i < ${#s}; i++)); do
         printf -v cp '%d' "'${s:i:1}"
+        ((cp &= 255))
+        count=0
+        if ((cp >= 0xc2 && cp <= 0xdf)); then
+            count=1; ((cp &= 0x1f))
+        elif ((cp >= 0xe0 && cp <= 0xef)); then
+            count=2; ((cp &= 0x0f))
+        elif ((cp >= 0xf0 && cp <= 0xf4)); then
+            count=3; ((cp &= 0x07))
+        fi
+        for ((j = 0; j < count && i + 1 < ${#s}; j++)); do
+            ((i += 1))
+            printf -v byte '%d' "'${s:i:1}"
+            ((cp = (cp << 6) | (byte & 0x3f)))
+        done
         if ((cp >= 0x1100 && (cp <= 0x115f \
             || (cp >= 0x2e80 && cp <= 0x303e) \
             || (cp >= 0x3041 && cp <= 0x33ff) \
@@ -123,12 +275,12 @@ _motd_dwidth() {
     REPLY=$w
 }
 
-# $1 を表示幅 $2 で折り返し、各行を $2 桁ちょうどに右詰めして MOTD_LINES に入れる
+# $1 を表示幅 $2 で折り返し、行末を空白で埋めて MOTD_LINES に入れる
 # タブ・改行・連続空白は潰すので fortune の整形済みテキストでも崩れない
 _motd_wrap() {
     local text=$1 width=$2
     local -a words
-    local word line='' lw=0 ww i c cw n
+    local word line='' lw=0 ww i c cw n padded
 
     MOTD_LINES=()
     text=${text//[[:cntrl:]]/ }
@@ -174,11 +326,21 @@ _motd_wrap() {
 
     for ((n = 0; n < ${#MOTD_LINES[@]}; n++)); do
         _motd_dwidth "${MOTD_LINES[n]}"
-        printf -v "MOTD_LINES[$n]" '%s%*s' "${MOTD_LINES[n]}" "$((width - REPLY))" ''
+        # macOS 標準の Bash 3.2 は printf -v で配列要素へ代入できない。
+        printf -v padded '%s%*s' "${MOTD_LINES[n]}" "$((width - REPLY))" ''
+        MOTD_LINES[n]=$padded
     done
 }
 
 motd() {
+    # 起動時も使用量を表示する。--brief は GPU の再検出だけを省く。
+    local brief=0
+    case "${1:-}" in
+        --brief) brief=1 ;;
+        '') ;;
+        *) printf 'usage: motd [--brief]\n' >&2; return 2 ;;
+    esac
+
     # 左のアートに40列、右の情報欄に40列を使う。
     local text_col=41
     local box_width=40
@@ -190,10 +352,15 @@ motd() {
     local label_col=$'\033[38;2;234;67;141m'
     local reset=$'\033[0m'
 
-    cat ~/.motd_art
-
-    local art_lines
-    art_lines=$(wc -l < ~/.motd_art)
+    local cols=${COLUMNS:-80} art_lines=0 compact=1
+    [[ $cols =~ ^[0-9]+$ ]] || cols=80
+    [ "$cols" -ge 2 ] || return 0
+    if [[ -t 1 && ${TERM:-dumb} != dumb && $cols -ge 80 && -r "$HOME/.motd_art" ]]; then
+        art_lines=$(wc -l < "$HOME/.motd_art")
+        if ((art_lines >= 3 && ${LINES:-35} > art_lines)); then
+            compact=0
+        fi
+    fi
 
     local quote
     quote=$(fortune -s -n 120 2>/dev/null)
@@ -201,32 +368,50 @@ motd() {
 
     local items=(
         "USER:||$USER"
-        "HOST:||$(hostname)"
+        "HOST:||${HOSTNAME:-$(hostname)}"
         "KERNEL:||$(uname -r)"
         "UPTIME:||$(get_uptime)"
         "MEMORY:||$(get_memory)"
         "CPU:||$(get_cpu)"
-        "DISK:||$(df -h / | awk 'NR==2{print $3"/"$2" ("$5")"}')"
-        "GPU:||$(get_gpu)"
+        "DISK:||$(LC_ALL=C df -h / | awk 'NR==2{print $3"/"$2" ("$5")"}')"
         "IP:||$(get_ip)"
+    )
+    if ((brief)); then
+        items+=("GPU:||$(get_gpu --cached)")
+    else
+        items+=("GPU:||$(get_gpu)")
+    fi
+
+    local battery
+    battery=$(get_battery)
+    [ -n "$battery" ] && items+=("BATTERY:||$battery")
+
+    items+=(
         "DATE:||$(date '+%Y-%m-%d %H:%M')"
         "TODO:||$(head -1 ~/.todo 2>/dev/null || echo 'Nothing!')"
         "QUOTE:||$quote"
     )
 
-    local battery
-    battery=$(get_battery)
-    if [ -n "$battery" ]; then
-        items+=("BATTERY:||$battery")
-    fi
-
     # 吹き出しの中身を value_width で折り返して組み立てる
     local body_label=() body_value=()
     local item label value line first
+
+    # 狭い／低いペイン、アートなし、リダイレクト時はカーソル移動を使わない。
+    if ((compact)); then
+        for item in "${items[@]}"; do
+            label="${item%%||*}"
+            value="${item#*||}"
+            _motd_wrap "$label ${value:--}" "$cols"
+            printf '%s\n' "${MOTD_LINES[@]}"
+        done
+        return 0
+    fi
+
+    cat "$HOME/.motd_art"
     local max_body=$((art_lines - 2))
     for item in "${items[@]}"; do
         label="${item%%||*}"
-        value="${item##*||}"
+        value="${item#*||}"
         [ -z "$value" ] && value="-"
         _motd_wrap "$value" "$value_width"
         first=1
@@ -277,35 +462,100 @@ motd() {
 
     local remaining=$((art_lines - start_row - box_height))
     [ "$remaining" -gt 0 ] && printf "\033[%dB" "$remaining"
+    return 0
 }
-motd
+# パイプやコマンド置換には起動メッセージを混ぜない。
+[[ -t 1 ]] && motd --brief
+
+# fzf: Ctrl+T でパス挿入、Alt+C で移動、Ctrl+R で履歴検索。
+if command -v fzf >/dev/null 2>&1; then
+    export FZF_DEFAULT_OPTS="${FZF_DEFAULT_OPTS---height=40% --layout=reverse --border}"
+    if _fzf_init=$(fzf --bash 2>/dev/null); then
+        eval "$_fzf_init"
+    else
+        # --bash がない旧版もディストリ同梱の連携スクリプトで使える。
+        for _fzf_dir in /usr/share/fzf "${HOMEBREW_PREFIX:-/nonexistent}/opt/fzf/shell" "$HOME/.fzf/shell"; do
+            if [ -r "$_fzf_dir/key-bindings.bash" ]; then
+                source "$_fzf_dir/key-bindings.bash"
+                [ -r "$_fzf_dir/completion.bash" ] && source "$_fzf_dir/completion.bash"
+                break
+            fi
+        done
+    fi
+    unset _fzf_init _fzf_dir
+fi
 
 # ghq + fzf でリポジトリにジャンプ
 ghq-fzf() {
-    local dir=$(ghq list -p | fzf --query "$1")
+    local dir
+    command -v ghq >/dev/null 2>&1 && command -v fzf >/dev/null 2>&1 || {
+        printf 'ghq と fzf をインストールしてください。\n' >&2
+        return 127
+    }
+    dir=$(ghq list -p | fzf --query "${1:-}") || return
     if [ -n "$dir" ]; then
-        cd "$dir"
+        cd -- "$dir" || return
     fi
 }
 bind '"\C-]": "\C-a\C-k ghq-fzf\n"'
 
-export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
-export ANDROID_HOME=$HOME/Android/Sdk
-export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/29.0.14206865
-export PATH=$PATH:$ANDROID_HOME/platform-tools
+# Java / Android: 明示した設定を優先し、インストール済みのものだけ自動検出する。
+_bashrc_dev_env() {
+    local java_home sdk ndk ndk_version
+    if [ -z "${JAVA_HOME:-}" ]; then
+        case "$OSTYPE" in
+            linux*)
+                for java_home in /usr/lib/jvm/java-17-openjdk /usr/lib/jvm/default; do
+                    [ -x "$java_home/bin/java" ] && export JAVA_HOME="$java_home" && break
+                done
+                ;;
+            darwin*)
+                if java_home=$(/usr/libexec/java_home -v 17 2>/dev/null) || java_home=$(/usr/libexec/java_home 2>/dev/null); then
+                    export JAVA_HOME="$java_home"
+                fi
+                ;;
+        esac
+    fi
+    if [ -z "${ANDROID_HOME:-}" ]; then
+        for sdk in "${ANDROID_SDK_ROOT:-}" "$HOME/Android/Sdk" "$HOME/Library/Android/sdk" /opt/android-sdk; do
+            [ -d "$sdk" ] && export ANDROID_HOME="$sdk" && break
+        done
+    fi
+    if [ -n "${ANDROID_HOME:-}" ]; then
+        [ -d "$ANDROID_HOME/platform-tools" ] && _path_prepend "$ANDROID_HOME/platform-tools"
+        if [ -z "${ANDROID_NDK_HOME:-}" ]; then
+            ndk_version=$(
+                for ndk in "$ANDROID_HOME"/ndk/[0-9]*; do
+                    [ -d "$ndk" ] && printf '%s\n' "${ndk##*/}"
+                done | LC_ALL=C sort -t. -k1,1n -k2,2n -k3,3n | tail -1
+            )
+            if [ -n "$ndk_version" ]; then
+                export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$ndk_version"
+            elif [ -d "$ANDROID_HOME/ndk-bundle" ]; then
+                export ANDROID_NDK_HOME="$ANDROID_HOME/ndk-bundle"
+            fi
+        fi
+    fi
+    return 0
+}
+_bashrc_dev_env
+unset -f _bashrc_dev_env
 
 # starship
-eval "$(starship init bash)"
+if command -v starship >/dev/null 2>&1; then
+    export STARSHIP_CONFIG="${STARSHIP_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/starship.toml}"
+    eval "$(starship init bash)"
+fi
 # deno (未インストールの環境ではスキップ)
 [ -f "$HOME/.deno/env" ] && . "$HOME/.deno/env"
 
 # >>> grok installer >>>
-export PATH="$HOME/.grok/bin:$PATH"
+_path_prepend "$HOME/.grok/bin"
 [[ -r "$HOME/.grok/completions/bash/grok.bash" ]] && source "$HOME/.grok/completions/bash/grok.bash"
 # <<< grok installer <<<
 
 # opencode
-export PATH=/home/m96-chan/.opencode/bin:$PATH
+_path_prepend "$HOME/.opencode/bin"
 
 # --- AUR ビルド用の環境分離 ---------------------------------------
 # pyenv の shim が makepkg 内の `python` を 3.11 に乗っ取ってしまい、
@@ -314,7 +564,7 @@ export PATH=/home/m96-chan/.opencode/bin:$PATH
 # uv も同様に、管理版 Python をダウンロードせずシステム Python を使う。
 _aur_build_env() {
     local p
-    p=$(printf '%s' "$PATH" | tr ':' '\n' | grep -vF "$HOME/.pyenv" | paste -sd:)
+    p=$(printf '%s' "$PATH" | tr ':' '\n' | grep -vF "${PYENV_ROOT:-$HOME/.pyenv}" | paste -sd: -)
     env -u PYENV_VERSION -u PYENV_ROOT -u PKG_CONFIG_PATH \
         PATH="$p" \
         UV_PYTHON_PREFERENCE=only-system \
@@ -374,3 +624,36 @@ goose-review() {
         --params plan="$(_goose_arg "$1")" \
         --params implementation_report="$(_goose_arg "$2")"
 }
+
+# --- Go ------------------------------------------------------------
+# go install の出力先。GOBIN と、複数指定された GOPATH の先頭にも対応する。
+_bashrc_go_paths=''
+if command -v go >/dev/null 2>&1; then
+    _bashrc_go_paths=$(go env GOBIN GOPATH 2>/dev/null) || _bashrc_go_paths=''
+fi
+_bashrc_go_bin=${_bashrc_go_paths%%$'\n'*}
+_bashrc_go_path=${_bashrc_go_paths#*$'\n'}
+_bashrc_go_path=${_bashrc_go_path:-${GOPATH:-$HOME/go}}
+_path_prepend "${_bashrc_go_bin:-${GOBIN:-${_bashrc_go_path%%:*}/bin}}"
+unset _bashrc_go_paths _bashrc_go_bin _bashrc_go_path
+
+# cgo で libmagic を使う Go 製ツール (pistol など) のビルド用。
+# Homebrew の libmagic は keg-only で ${HOMEBREW_PREFIX}/include に
+# リンクされないため、ヘッダとライブラリの場所を明示する必要がある。
+# Arch は file パッケージがヘッダも標準パスに置くので不要。
+case "$OSTYPE" in
+    darwin*)
+        _libmagic="${HOMEBREW_PREFIX:-/opt/homebrew}/opt/libmagic"
+        if [ -d "$_libmagic" ]; then
+            case " ${CGO_CFLAGS:-} " in
+                *" -I$_libmagic/include "*) ;;
+                *) export CGO_CFLAGS="-I$_libmagic/include${CGO_CFLAGS:+ $CGO_CFLAGS}" ;;
+            esac
+            case " ${CGO_LDFLAGS:-} " in
+                *" -L$_libmagic/lib "*) ;;
+                *) export CGO_LDFLAGS="-L$_libmagic/lib${CGO_LDFLAGS:+ $CGO_LDFLAGS}" ;;
+            esac
+        fi
+        unset _libmagic
+        ;;
+esac

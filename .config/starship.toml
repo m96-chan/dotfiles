@@ -2,7 +2,7 @@
 
 format = """
 [░▒▓](#a3d2b2)\
-[  ](bg:#a3d2b2 fg:#090c0c)\
+$os\
 [](bg:#76f0a0 fg:#a3d2b2)\
 $directory\
 [](fg:#76f0a0 bg:#2a4a35)\
@@ -17,6 +17,17 @@ $php\
 $time\
 [ ](fg:#1a2b1f)\
 \n$character"""
+
+[os]
+disabled = false
+style = "bg:#a3d2b2 fg:#090c0c"
+format = '[ $symbol ]($style)'
+
+[os.symbols]
+Arch = ""
+Macos = ""
+Fedora = ""
+Linux = ""
 
 [directory]
 style = "fg:#090c0c bg:#76f0a0"

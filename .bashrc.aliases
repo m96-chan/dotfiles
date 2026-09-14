@@ -19,5 +19,6 @@ alias h='history | grep'
 alias cls='clear'
 
 alias ll="ls -la"
+alias p='pistol'
 
 alias vc="claude --dangerously-skip-permissions"
