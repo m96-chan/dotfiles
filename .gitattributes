@@ -1,0 +1,4 @@
+# Windows で clone すると core.autocrlf により作業ツリーが CRLF になる。
+# bash/zsh スクリプトや MOTD アートは LF でないと壊れるため固定する。
+* text=auto eol=lf
+*.png binary

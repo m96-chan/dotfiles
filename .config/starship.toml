@@ -29,6 +29,7 @@ EndeavourOS = ""
 Macos = ""
 Fedora = ""
 Linux = ""
+Windows = "󰍲"
 
 [directory]
 style = "fg:#090c0c bg:#76f0a0"

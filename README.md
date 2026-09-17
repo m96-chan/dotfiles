@@ -9,8 +9,10 @@
 [![OS](https://img.shields.io/badge/Arch-1793D1?style=flat-square&logo=archlinux&logoColor=white)](https://archlinux.org/)
 [![OS](https://img.shields.io/badge/Fedora-51A2DA?style=flat-square&logo=fedora&logoColor=white)](https://fedoraproject.org/)
 [![OS](https://img.shields.io/badge/macOS-000000?style=flat-square&logo=apple&logoColor=white)](https://www.apple.com/macos/)
+[![OS](https://img.shields.io/badge/Windows-0078D4?style=flat-square&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
 [![Terminal](https://img.shields.io/badge/Kitty-000000?style=flat-square&logo=gnometerminal&logoColor=white)](https://sw.kovidgoyal.net/kitty/)
 [![Shell](https://img.shields.io/badge/Bash-4EAA25?style=flat-square&logo=gnubash&logoColor=white)](https://www.gnu.org/software/bash/)
+[![Shell](https://img.shields.io/badge/PowerShell-5391FE?style=flat-square&logo=powershell&logoColor=white)](https://learn.microsoft.com/powershell/)
 [![Prompt](https://img.shields.io/badge/Starship-DD0B78?style=flat-square&logo=starship&logoColor=white)](https://starship.rs/)
 
 </div>
@@ -20,6 +22,7 @@
 Bash + Kitty + Starship をベースにした個人用 dotfiles。
 ターミナル起動時にシステム情報を表示する MOTD、Tokyo Night カラースキーム、AI/Tech ニュースダッシュボードなどを含む。
 Arch Linux の pacman 環境と macOS（Apple Silicon / Intel）で共通利用する。Homebrew は任意。
+Windows では Bash の代わりに PowerShell 用プロファイルを同じ構成で提供する。MOTD やエイリアスの使い勝手は揃えてある。
 
 ## 構成
 
@@ -27,6 +30,8 @@ Arch Linux の pacman 環境と macOS（Apple Silicon / Intel）で共通利用�
 .
 ├── .bashrc              # メイン設定 (MOTD, ghq+fzf, starship 等)
 ├── .bashrc.aliases      # エイリアス定義
+├── profile.ps1          # PowerShell 版のメイン設定 (.bashrc 相当)
+├── profile.aliases.ps1  # PowerShell 版のエイリアス定義
 ├── .gitconfig.aliases   # Git エイリアス
 ├── .motd_art            # MOTD 用アスキーアート
 ├── .config/
@@ -35,7 +40,9 @@ Arch Linux の pacman 環境と macOS（Apple Silicon / Intel）で共通利用�
 │   ├── wtf/config.yml   # WTF ダッシュボード設定
 │   ├── goose/          # Goose 設定・レシピ
 │   └── pistol/pistol.conf # 画像・動画プレビュー
-├── setup.sh             # シンボリックリンク作成スクリプト
+├── setup.sh             # シンボリックリンク作成スクリプト (macOS / Linux)
+├── setup.ps1            # シンボリックリンク作成スクリプト (Windows)
+├── .gitattributes       # 作業ツリーの改行を LF に固定する
 └── splash.png           # スプラッシュ画像
 ```
 
@@ -57,12 +64,16 @@ Arch Linux の pacman 環境と macOS（Apple Silicon / Intel）で共通利用�
 | [fortune](https://wiki.archlinux.org/title/Fortune) | MOTD のランダム名言表示 |
 | [Pistol](https://github.com/doronbehar/pistol) | `p` で呼ぶファイルプレビューア |
 | [Chafa](https://hpjansson.org/chafa/) / [FFmpeg](https://ffmpeg.org/) | Pistol の画像・動画プレビュー |
-| [HackGen Console NF](https://github.com/yuru7/HackGen) | Kitty で使用するフォント (Nerd Fonts 対応) |
+| [Windows Terminal](https://github.com/microsoft/terminal) | Windows のターミナル (Kitty の代わり) |
+| [PSFzf](https://github.com/kelleyma49/PSFzf) | PowerShell の fzf 連携 (`Ctrl+T` / `Ctrl+R` / `Alt+C`) |
+| [HackGen Console NF](https://github.com/yuru7/HackGen) | Kitty / Windows Terminal で使用するフォント (Nerd Fonts 対応) |
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | AI コーディングアシスタント CLI |
 
 ## インストール
 
-### 共通 (全 OS)
+### 共通 (macOS / Linux)
+
+Windows は `setup.sh` ではなく `setup.ps1` を使う ([Windows (PowerShell)](#windows-powershell))。
 
 ```bash
 # 1. リポジトリをクローン
@@ -127,6 +138,40 @@ rpm-ostree install kitty fzf fortune-mod
 
 # Homebrew (Linuxbrew) を使う方法を推奨 (下記参照)
 ```
+
+### Windows (PowerShell)
+
+Windows PowerShell 5.1 と PowerShell 7 のどちらでも動く。Bash と WSL は不要。
+
+```powershell
+# 1. リポジトリをクローン
+git clone https://github.com/m96-chan/dotfiles.git $HOME\dotfiles
+
+# 2. ツールをインストール
+winget install Starship.Starship junegunn.fzf x-motemen.ghq Microsoft.WindowsTerminal
+
+# 3. fzf のキーバインドを使う場合
+Install-Module PSFzf -Scope CurrentUser
+
+# 4. プロファイルとリンクを作成
+cd $HOME\dotfiles
+.\setup.ps1
+```
+
+スクリプトの実行が実行ポリシーでブロックされる場合:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+フォントは [HackGen Console NF](https://github.com/yuru7/HackGen/releases) の zip を展開し、
+ttf を右クリック > インストール。Windows Terminal の設定でフォントに指定する。
+
+MOTD のアートと Starship の記号には ANSI/VT 対応の端末と Nerd Font が必要なので、
+Windows Terminal を使う。PowerShell ISE では MOTD と Starship を自動で無効にする。
+
+`fortune` は Windows に無いため、`QUOTE:` は `Stay curious.` 固定になる。
+Kitty・WTF・Pistol は Windows 版が無いので `setup.ps1` はリンクしない。
 
 ### Homebrew (Linux 共通)
 
@@ -207,6 +252,33 @@ Go の出力先は `GOBIN`、または `GOPATH` の先頭の `bin`（未設定�
 Git エイリアスはこのリポジトリの `.gitconfig.aliases` で編集する。変更は次の Git コマンドから有効になる。
 `.gitconfig` 本体のユーザー名・メールアドレス・認証設定などは各マシンで管理する。
 
+## setup.ps1 の動作
+
+`setup.ps1` は Windows で以下のシンボリックリンクを作成する:
+
+| リンク先 | リンク元 |
+|----------|----------|
+| `Documents\WindowsPowerShell\profile.ps1` | `profile.ps1` |
+| `Documents\WindowsPowerShell\profile.aliases.ps1` | `profile.aliases.ps1` |
+| `Documents\PowerShell\profile.ps1` | `profile.ps1` (PowerShell 7 がある場合) |
+| `Documents\PowerShell\profile.aliases.ps1` | `profile.aliases.ps1` (同上) |
+| `~\.gitconfig.aliases` | `.gitconfig.aliases` |
+| `~\.motd_art` | `.motd_art` |
+| `~\.config\starship.toml` | `.config/starship.toml` |
+| `~\.config\goose\config.yaml` | `.config/goose/config.yaml` |
+| `~\.config\goose\recipes` | `.config/goose/recipes` |
+
+ドキュメントフォルダは OneDrive にリダイレクトされていても正しい場所を使う。
+`XDG_CONFIG_HOME` を設定していれば `~\.config` の代わりにそのディレクトリを使う。
+退避とバックアップの扱い、Git の `include.path` の登録は `setup.sh` と同じ。
+
+Windows のシンボリックリンク作成には**管理者権限**か**開発者モード**が必要になる。
+どちらも無い場合はコピーで配置して警告を出す。
+コピーではリポジトリを編集しても反映されないので、次のどちらかを行って再実行する。
+
+- 設定 > システム > 開発者向け > 開発者モード を有効にする
+- PowerShell を管理者として実行する
+
 ## カスタマイズ
 
 ### OS 別の環境設定
@@ -215,6 +287,8 @@ Git エイリアスはこのリポジトリの `.gitconfig.aliases` で編集す
 未設定の場合はインストール済みの JDK、Android SDK、NDK を検出する。
 Arch の Java は Java 17、次に `/usr/lib/jvm/default`、macOS は `java_home` で Java 17、次に既定の JDK を探す。
 SDK は `~/Android/Sdk`・`~/Library/Android/sdk`・`/opt/android-sdk` を候補とし、NDK はインストール済みの最新バージョンを使う。
+Windows では JDK を `Program Files` の Eclipse Adoptium・Microsoft・Java・Amazon Corretto・Zulu から探し、
+見つからなければ Android Studio 同梱の JBR を使う。SDK は `%LOCALAPPDATA%\Android\Sdk` を候補にする。
 
 Starship のOSアイコンは実行中のOSに合わせて変わる。Starship 未導入時は通常の Bash プロンプトを使う。
 ログイン Bash から `.bashrc` が読み込まれない環境では、既存の `~/.bash_profile` に次を追加する:
@@ -222,6 +296,22 @@ Starship のOSアイコンは実行中のOSに合わせて変わる。Starship �
 ```bash
 [[ -r ~/.bashrc ]] && source ~/.bashrc
 ```
+
+### PowerShell のエイリアス
+
+`profile.aliases.ps1` は `.bashrc.aliases` と同じ名前のコマンドを用意する。
+PowerShell はエイリアスを関数より先に解決するため、次の組み込みエイリアスを**上書きする**。
+
+| 名前 | 元の意味 | 上書き後 |
+|------|----------|----------|
+| `gc` | `Get-Content` | `git commit -m` |
+| `gp` | `Get-ItemProperty` | `git push` |
+| `gl` | `Get-Location` | `git log --oneline -20` |
+| `h` | `Get-History` | 履歴を正規表現で絞り込む (`history \| grep` 相当) |
+
+元のコマンドはフルネーム (`Get-Content` など) でそのまま使える。
+`reload` は読み込み済みのプロファイルを読み直す (`source ~/.bashrc` 相当)。
+`p` は pistol が入っている環境でのみ定義する。
 
 ### MOTD
 
@@ -234,10 +324,12 @@ chafa --size=40x34 your_image.png > ~/.motd_art
 
 起動時から CPU使用率・メモリ使用量・ルートディスク使用量/使用率・ローカルIPv4アドレスを表示する。
 バッテリーがある場合は残量も表示する。
-CPU使用率の計測には Linux で約0.1秒、macOS で約1秒かかる。
+CPU使用率の計測には Linux と Windows で約0.1秒、macOS で約1秒かかる。
+Windows は WMI の生カウンタが短い区間では当てにならないため、全プロセスの CPU 時間の差分から求める。
 macOS では標準の `iostat` を使い、`top` による全プロセスの走査を避ける。
 GPU名は起動時にはキャッシュから表示し、未作成の場合は `-` と表示する。
 `motd` を実行するとGPU名も再取得して `${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/` に保存する。
+Windows も同じ場所にキャッシュし、`motd` (`Show-Motd`) と `motd -Brief` で同じように動く。
 `motd --brief` は起動時と同じ表示で、GPU名の再取得だけを省く。
 
 MOTD の `TODO:` 欄には `~/.todo` の先頭行を表示する。ファイルがなければ `Nothing!` になる。
@@ -248,6 +340,8 @@ todo                 # 一覧を表示
 todo "牛乳を買う"    # 1行追加
 todo -d              # 先頭行（MOTD に出ている行）を削除
 ```
+
+Windows では `todo` も同じ使い方で、`~/.todo` は BOM 無しの UTF-8 で読み書きするので Bash 側と共用できる。
 
 端末幅は PTY から取得し、SSH接続直後の `COLUMNS` が未設定・古い場合にも対応する。
 横80列以上ならアートを表示する。高さが34行未満でも、スクロールしながら全行を出力する。
@@ -282,6 +376,15 @@ wtfutil
 | `Alt+C` | fzf で選んだディレクトリに移動 |
 | `Ctrl+R` | fzf でコマンド履歴を検索 |
 
+### PowerShell
+
+| キー | 動作 |
+|------|------|
+| `Ctrl+]` | ghq + fzf でリポジトリにジャンプ |
+| `Ctrl+T` | fzf で選んだファイル・ディレクトリのパスを挿入 (PSFzf) |
+| `Alt+C` | fzf で選んだディレクトリに移動 (PSFzf) |
+| `Ctrl+R` | fzf でコマンド履歴を検索 (PSFzf) |
+
 ### Kitty
 
 | キー | 動作 |
@@ -296,7 +399,7 @@ wtfutil
 
 ### Git エイリアス
 
-`.gitconfig.aliases` で管理する。`g` は Bash 側で `git` のエイリアスなので、`g st` のようにも使える。
+`.gitconfig.aliases` で管理する。`g` は Bash / PowerShell 側で `git` のエイリアスなので、`g st` のようにも使える。
 
 | エイリアス | コマンド |
 |-----------|---------|
