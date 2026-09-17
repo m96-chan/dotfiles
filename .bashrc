@@ -113,6 +113,23 @@ unset -f _bashrc_load_nvm
 # Activate the retained Python 3.14 ML environment when needed.
 ml-python() { source "$HOME/.local/share/venvs/ml-py314/bin/activate"; }
 
+# MOTD の TODO 欄が読む ~/.todo を操作する。
+# 引数なしで一覧、引数ありで1行追加、-d で先頭行（MOTD に出る行）を削除。
+todo() {
+    local file="$HOME/.todo"
+    case ${1-} in
+        '')
+            [ -s "$file" ] && cat -- "$file" || echo 'Nothing!'
+            ;;
+        -d)
+            [ -s "$file" ] && sed -i.bak '1d' -- "$file" && rm -f -- "$file.bak"
+            ;;
+        *)
+            printf '%s\n' "$*" >> "$file"
+            ;;
+    esac
+}
+
 # history
 HISTSIZE=10000
 HISTFILESIZE=20000
