@@ -25,6 +25,7 @@ format = '[ $symbol ]($style)'
 
 [os.symbols]
 Arch = ""
+EndeavourOS = ""
 Macos = ""
 Fedora = ""
 Linux = ""
